@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg-color)" }}>
       <div className="glass-panel animate-fade-in" style={{ width: "100%", maxWidth: "420px", padding: "40px", borderRadius: "16px" }}>
-        
+
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{ display: "inline-flex", background: "var(--primary)", padding: "12px", borderRadius: "50%", marginBottom: "16px", color: "#fff" }}>
             <Lock size={32} />
@@ -70,9 +70,9 @@ export default function LoginPage() {
             <label>E-mail</label>
             <div style={{ position: "relative" }}>
               <Mail size={18} color="var(--text-muted)" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
-              <input 
-                type="email" 
-                className="input-field" 
+              <input
+                type="email"
+                className="input-field"
                 placeholder="seuemail@exemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -86,9 +86,9 @@ export default function LoginPage() {
             <label>Senha</label>
             <div style={{ position: "relative" }}>
               <KeyRound size={18} color="var(--text-muted)" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
-              <input 
-                type="password" 
-                className="input-field" 
+              <input
+                type="password"
+                className="input-field"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -97,29 +97,23 @@ export default function LoginPage() {
               />
             </div>
           </div>
-          
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            disabled={loading || !email || !password} 
+
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={loading || !email || !password}
             style={{ width: "100%", justifyContent: "center", marginTop: "8px", padding: "14px" }}
           >
             {loading ? "Autenticando..." : "Entrar no Painel"}
           </button>
         </form>
 
-        <div style={{ textAlign: "center", marginTop: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ textAlign: "center", marginTop: "24px" }}>
           <Link href="/forgot-password" style={{ color: "var(--primary)", fontSize: "14px", textDecoration: "none", fontWeight: 500 }}>
             Esqueceu sua senha?
           </Link>
-          <p style={{ fontSize: "14px", color: "var(--text-muted)", margin: 0 }}>
-            Não tem uma conta?{" "}
-            <Link href="/register" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
-              Criar conta
-            </Link>
-          </p>
         </div>
-        
+
       </div>
     </div>
   );

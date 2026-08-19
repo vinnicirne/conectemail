@@ -8,7 +8,7 @@ export default function SidebarWrapper() {
   const pathname = usePathname();
 
   // Esconder a barra lateral nas telas de autenticação
-  const hiddenPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
+  const hiddenPaths = ["/login", "/forgot-password", "/reset-password"];
   if (hiddenPaths.includes(pathname)) {
     return null;
   }
@@ -18,7 +18,7 @@ export default function SidebarWrapper() {
       <div style={{ padding: '0 16px 24px', fontWeight: 700, fontSize: '18px', color: 'var(--accent)' }}>
         Conect Email
       </div>
-      
+
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <Link href="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`}>
           <Mail size={20} />
