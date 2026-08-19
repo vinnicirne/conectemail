@@ -8,7 +8,7 @@ export default function SidebarWrapper() {
   const pathname = usePathname();
 
   // Esconder a barra lateral nas telas de autenticação
-  const hiddenPaths = ["/login", "/forgot-password", "/reset-password"];
+  const hiddenPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
   if (hiddenPaths.includes(pathname)) {
     return null;
   }

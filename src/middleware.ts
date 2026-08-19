@@ -7,7 +7,7 @@ const secret = new TextEncoder().encode(
 );
 
 // Rotas que não exigem login
-const publicPaths = ['/login', '/forgot-password', '/reset-password', '/api/auth/login', '/api/auth/forgot-password', '/api/auth/reset-password'];
+const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
