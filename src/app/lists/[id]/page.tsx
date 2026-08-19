@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, FileText, Upload, Trash2, CheckCircle2 } from "lucide-react";
@@ -19,7 +19,8 @@ type ContactList = {
   members: ContactListMember[];
 };
 
-export default function ListDetailsPage({ params }: { params: { id: string } }) {
+export default function ListDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: listId } = use(params);
   const router = useRouter();
   const [list, setList] = useState<ContactList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,11 +35,12 @@ export default function ListDetailsPage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     fetchList();
-  }, [params.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listId]);
 
   const fetchList = async () => {
     try {
-      const res = await fetch(`/api/lists/${params.id}`);
+      const res = await fetch(`/api/lists/${listId}`);
       if (res.ok) {
         setList(await res.json());
       } else {
@@ -68,7 +70,7 @@ export default function ListDetailsPage({ params }: { params: { id: string } }) 
     setResult(null);
 
     try {
-      const res = await fetch(`/api/lists/${params.id}/members`, {
+      const res = await fetch(`/api/lists/${listId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emails: extractedEmails, source: 'manual' })
@@ -95,7 +97,7 @@ export default function ListDetailsPage({ params }: { params: { id: string } }) 
     if (!confirm("Remover este contato da lista?")) return;
 
     try {
-      const res = await fetch(`/api/lists/${params.id}/members`, {
+      const res = await fetch(`/api/lists/${listId}/members`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ memberIds: [memberId] })

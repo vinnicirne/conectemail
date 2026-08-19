@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { emails, source = 'manual' } = await request.json();
+    const { id: listId } = await params;
 
     if (!Array.isArray(emails) || emails.length === 0) {
       return NextResponse.json({ error: 'Nenhum e-mail fornecido' }, { status: 400 });
     }
-
-    const listId = params.id;
 
     // Verificar se a lista existe
     const list = await prisma.contactList.findUnique({ where: { id: listId } });
@@ -18,7 +17,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     // Normalizar e-mails
-    const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase().trim()).filter(e => e.includes('@')))];
+    const normalizedEmails = [...new Set(emails.map((e: string) => e.toLowerCase().trim()).filter((e: string) => e.includes('@')))];
 
     // Buscar e-mails que já estão na lista para não duplicar
     const existingMembers = await prisma.contactListMember.findMany({
@@ -61,8 +60,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: listId } = await params;
     const { memberIds } = await request.json();
 
     if (!Array.isArray(memberIds) || memberIds.length === 0) {
@@ -71,7 +71,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     await prisma.contactListMember.deleteMany({
       where: {
-        listId: params.id,
+        listId,
         id: { in: memberIds }
       }
     });
