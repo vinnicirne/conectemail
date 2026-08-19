@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
+import crypto from 'crypto';
 
 // Listar campanhas
 export async function GET() {
   try {
-    const campaigns = await prisma.campaign.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { recipients: true }
-        }
-      }
-    });
+    const { data: campaigns, error } = await supabase
+      .from('Campaign')
+      .select('*, CampaignRecipient(count)')
+      .order('createdAt', { ascending: false });
 
-    return NextResponse.json(campaigns);
+    if (error) throw error;
+
+    const formattedCampaigns = campaigns.map(c => ({
+      ...c,
+      _count: {
+        recipients: c.CampaignRecipient?.[0]?.count || 0
+      }
+    }));
+
+    return NextResponse.json(formattedCampaigns);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -28,28 +34,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 });
     }
 
+    const campaignId = crypto.randomUUID();
+
     // Criar a campanha
-    const campaign = await prisma.campaign.create({
-      data: {
-        name,
-        subject,
-        html,
-        status: 'DRAFT'
-      }
+    const { error: campaignError } = await supabase.from('Campaign').insert({
+      id: campaignId,
+      name,
+      subject,
+      html,
+      status: 'DRAFT',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
 
-    // Inserir os destinatários
-    // Em SQLite local e batch pequeno, createMany é simulado. Se falhar no SQLite antigo, usar loop.
-    // Mas o Prisma V6 suporta createMany no SQLite!
-    await prisma.campaignRecipient.createMany({
-      data: recipients.map((email: string) => ({
-        campaignId: campaign.id,
-        email,
-        status: 'PENDING'
-      }))
-    });
+    if (campaignError) throw campaignError;
 
-    return NextResponse.json({ success: true, campaignId: campaign.id });
+    const recipientsData = recipients.map((email: string) => ({
+      id: crypto.randomUUID(),
+      campaignId,
+      email,
+      status: 'PENDING'
+    }));
+
+    // Inserir os destinatários em lotes para não estourar o limite de payload se for muito grande
+    const chunkSize = 500;
+    for (let i = 0; i < recipientsData.length; i += chunkSize) {
+      const chunk = recipientsData.slice(i, i + chunkSize);
+      const { error: recipientsError } = await supabase.from('CampaignRecipient').insert(chunk);
+      if (recipientsError) throw recipientsError;
+    }
+
+    return NextResponse.json({ success: true, campaignId });
 
   } catch (error: any) {
     console.error('Error creating campaign:', error);

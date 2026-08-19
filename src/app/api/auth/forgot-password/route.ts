@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { Resend } from 'resend';
 import crypto from 'crypto';
-
 
 export async function POST(request: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -13,9 +12,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'E-mail é obrigatório' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const { data: user } = await supabase
+      .from('User')
+      .select('email')
+      .eq('email', email.toLowerCase())
+      .single();
 
     if (!user) {
       // Retornar sucesso de qualquer forma por segurança (para não revelar se o email existe)
@@ -27,12 +28,12 @@ export async function POST(request: Request) {
     const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
 
     // Salvar token no banco
-    await prisma.passwordResetToken.create({
-      data: {
-        email: user.email,
-        token,
-        expires,
-      }
+    await supabase.from('PasswordResetToken').insert({
+      id: crypto.randomUUID(),
+      email: user.email,
+      token,
+      expires: expires.toISOString(),
+      createdAt: new Date().toISOString()
     });
 
     // Enviar email

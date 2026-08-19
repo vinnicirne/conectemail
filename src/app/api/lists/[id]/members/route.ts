@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
+import crypto from 'crypto';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,8 +12,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Verificar se a lista existe
-    const list = await prisma.contactList.findUnique({ where: { id: listId } });
-    if (!list) {
+    const { data: list, error: listError } = await supabase.from('ContactList').select('id').eq('id', listId).single();
+    if (listError || !list) {
       return NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 });
     }
 
@@ -20,15 +21,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const normalizedEmails = [...new Set(emails.map((e: string) => e.toLowerCase().trim()).filter((e: string) => e.includes('@')))];
 
     // Buscar e-mails que já estão na lista para não duplicar
-    const existingMembers = await prisma.contactListMember.findMany({
-      where: {
-        listId,
-        email: { in: normalizedEmails }
-      },
-      select: { email: true }
-    });
+    const { data: existingMembers, error: existingError } = await supabase
+      .from('ContactListMember')
+      .select('email')
+      .eq('listId', listId)
+      .in('email', normalizedEmails);
+      
+    if (existingError) throw existingError;
     
-    const existingEmails = new Set(existingMembers.map(m => m.email));
+    const existingEmails = new Set(existingMembers?.map(m => m.email) || []);
     const newEmails = normalizedEmails.filter(e => !existingEmails.has(e));
 
     if (newEmails.length === 0) {
@@ -40,14 +41,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
     }
 
-    // Inserir os novos
-    await prisma.contactListMember.createMany({
-      data: newEmails.map(email => ({
-        listId,
-        email,
-        source
-      }))
-    });
+    // Inserir os novos em lotes para evitar payload muito grande
+    const newMembersData = newEmails.map(email => ({
+      id: crypto.randomUUID(),
+      listId,
+      email,
+      source,
+      createdAt: new Date().toISOString()
+    }));
+
+    const chunkSize = 500;
+    for (let i = 0; i < newMembersData.length; i += chunkSize) {
+      const chunk = newMembersData.slice(i, i + chunkSize);
+      const { error: insertError } = await supabase.from('ContactListMember').insert(chunk);
+      if (insertError) throw insertError;
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -69,12 +77,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'IDs não fornecidos' }, { status: 400 });
     }
 
-    await prisma.contactListMember.deleteMany({
-      where: {
-        listId,
-        id: { in: memberIds }
-      }
-    });
+    const { error } = await supabase
+      .from('ContactListMember')
+      .delete()
+      .eq('listId', listId)
+      .in('id', memberIds);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

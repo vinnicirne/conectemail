@@ -1,28 +1,26 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q') || '';
 
   try {
-    // Buscar emails únicos que já enviamos mensagens (limitado a 20)
-    const emails = await prisma.email.findMany({
-      where: {
-        toAddress: {
-          contains: q
-        }
-      },
-      select: {
-        toAddress: true
-      },
-      distinct: ['toAddress'],
-      take: 20
-    });
+    // Supabase JS client doesn't have a built-in distinct for select without RPC, 
+    // so we fetch more and distinct in memory.
+    const { data: emails } = await supabase
+      .from('Email')
+      .select('toAddress')
+      .ilike('toAddress', `%${q}%`)
+      .limit(100);
 
-    const contacts = emails.map(e => e.toAddress);
+    if (!emails) {
+      return NextResponse.json([]);
+    }
 
-    return NextResponse.json(contacts);
+    const distinctContacts = [...new Set(emails.map(e => e.toAddress))].slice(0, 20);
+
+    return NextResponse.json(distinctContacts);
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
   }

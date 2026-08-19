@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
@@ -13,34 +13,34 @@ export async function POST(request: Request) {
     }
 
     // Buscamos o email no nosso banco de dados pelo ID do Resend
-    const emailRecord = await prisma.email.findUnique({
-      where: { resendId: emailId }
-    });
+    const { data: emailRecord, error: findError } = await supabase
+      .from('Email')
+      .select('*')
+      .eq('resendId', emailId)
+      .single();
 
-    if (!emailRecord) {
+    if (findError || !emailRecord) {
       return NextResponse.json({ error: 'Email record not found' }, { status: 404 });
     }
 
     // Atualizamos o status baseado no evento do Resend
     if (eventType === 'email.delivered') {
-      await prisma.email.update({
-        where: { id: emailRecord.id },
-        data: { status: 'DELIVERED' }
-      });
+      await supabase.from('Email').update({
+        status: 'DELIVERED',
+        updatedAt: new Date().toISOString()
+      }).eq('id', emailRecord.id);
     } else if (eventType === 'email.opened') {
-      await prisma.email.update({
-        where: { id: emailRecord.id },
-        data: { 
-          status: 'OPENED',
-          openedCount: emailRecord.openedCount + 1,
-          lastOpenedAt: new Date()
-        }
-      });
+      await supabase.from('Email').update({
+        status: 'OPENED',
+        openedCount: emailRecord.openedCount + 1,
+        lastOpenedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }).eq('id', emailRecord.id);
     } else if (eventType === 'email.bounced') {
-      await prisma.email.update({
-        where: { id: emailRecord.id },
-        data: { status: 'BOUNCED' }
-      });
+      await supabase.from('Email').update({
+        status: 'BOUNCED',
+        updatedAt: new Date().toISOString()
+      }).eq('id', emailRecord.id);
     }
 
     return NextResponse.json({ success: true });

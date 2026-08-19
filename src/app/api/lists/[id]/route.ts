@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const list = await prisma.contactList.findUnique({
-      where: { id },
-      include: {
-        members: {
-          orderBy: { createdAt: 'desc' }
-        }
-      }
-    });
+    const { data: list, error } = await supabase
+      .from('ContactList')
+      .select('*, members:ContactListMember(*)')
+      .eq('id', id)
+      .order('createdAt', { referencedTable: 'ContactListMember', ascending: false })
+      .single();
 
-    if (!list) {
+    if (error || !list) {
       return NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 });
     }
 
@@ -27,9 +25,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    await prisma.contactList.delete({
-      where: { id }
-    });
+    const { error } = await supabase.from('ContactList').delete().eq('id', id);
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {

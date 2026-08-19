@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import { Resend } from 'resend';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -8,9 +8,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const campaign = await prisma.campaign.findUnique({
-      where: { id }
-    });
+    const { data: campaign } = await supabase
+      .from('Campaign')
+      .select('*')
+      .eq('id', id)
+      .single();
 
     if (!campaign) {
       return NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 });
@@ -21,10 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Marca como enviando
-    await prisma.campaign.update({
-      where: { id },
-      data: { status: 'SENDING' }
-    });
+    await supabase.from('Campaign').update({ status: 'SENDING', updatedAt: new Date().toISOString() }).eq('id', id);
 
     // Fire & Forget: inicia o processamento assíncrono em background
     processCampaign(id).catch(console.error);
@@ -41,18 +40,20 @@ async function processCampaign(campaignId: string) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   try {
-    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+    const { data: campaign } = await supabase.from('Campaign').select('*').eq('id', campaignId).single();
     if (!campaign) return;
 
     let hasMore = true;
 
     while (hasMore) {
-      const recipients = await prisma.campaignRecipient.findMany({
-        where: { campaignId, status: 'PENDING' },
-        take: 10
-      });
+      const { data: recipients } = await supabase
+        .from('CampaignRecipient')
+        .select('*')
+        .eq('campaignId', campaignId)
+        .eq('status', 'PENDING')
+        .limit(10);
 
-      if (recipients.length === 0) {
+      if (!recipients || recipients.length === 0) {
         hasMore = false;
         break;
       }
@@ -70,32 +71,26 @@ async function processCampaign(campaignId: string) {
             throw new Error(error.message);
           }
 
-          await prisma.campaignRecipient.update({
-            where: { id: recipient.id },
-            data: { status: 'SENT', sentAt: new Date() }
-          });
+          await supabase.from('CampaignRecipient').update({
+            status: 'SENT',
+            sentAt: new Date().toISOString()
+          }).eq('id', recipient.id);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          await prisma.campaignRecipient.update({
-            where: { id: recipient.id },
-            data: { status: 'FAILED', error: msg }
-          });
+          await supabase.from('CampaignRecipient').update({
+            status: 'FAILED',
+            error: msg
+          }).eq('id', recipient.id);
         }
 
         await sleep(350);
       }
     }
 
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { status: 'COMPLETED' }
-    });
+    await supabase.from('Campaign').update({ status: 'COMPLETED', updatedAt: new Date().toISOString() }).eq('id', campaignId);
 
   } catch (globalError) {
     console.error('Fatal error processing campaign:', globalError);
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { status: 'FAILED' }
-    });
+    await supabase.from('Campaign').update({ status: 'FAILED', updatedAt: new Date().toISOString() }).eq('id', campaignId);
   }
 }

@@ -1,13 +1,16 @@
-import prisma from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 // date-fns removido para usar Intl nativo
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const emails = await prisma.email.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const { data: emails } = await supabase
+    .from("Email")
+    .select("*")
+    .order("createdAt", { ascending: false });
+
+  const emailsList = emails || [];
 
   return (
     <div className="glass-panel animate-fade-in" style={{ padding: "32px", minHeight: "100%" }}>
@@ -18,13 +21,13 @@ export default async function Home() {
         </Link>
       </div>
 
-      {emails.length === 0 ? (
+      {emailsList.length === 0 ? (
         <div style={{ textAlign: "center", padding: "64px 0", color: "var(--text-muted)" }}>
           Nenhum email enviado ainda.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {emails.map((email) => (
+          {emailsList.map((email) => (
             <Link key={email.id} href={`/emails/${email.id}`} style={{ textDecoration: "none" }}>
               <div
                 className="email-card"

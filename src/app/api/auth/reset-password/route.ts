@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
@@ -11,17 +11,19 @@ export async function POST(request: Request) {
     }
 
     // Verificar se o token existe e não expirou
-    const resetRecord = await prisma.passwordResetToken.findUnique({
-      where: { token },
-    });
+    const { data: resetRecord } = await supabase
+      .from('PasswordResetToken')
+      .select('*')
+      .eq('token', token)
+      .single();
 
     if (!resetRecord) {
       return NextResponse.json({ error: 'Link de recuperação inválido ou já utilizado' }, { status: 400 });
     }
 
-    if (resetRecord.expires < new Date()) {
+    if (new Date(resetRecord.expires) < new Date()) {
       // Deletar o token expirado
-      await prisma.passwordResetToken.delete({ where: { id: resetRecord.id } });
+      await supabase.from('PasswordResetToken').delete().eq('id', resetRecord.id);
       return NextResponse.json({ error: 'Este link de recuperação expirou. Solicite um novo.' }, { status: 400 });
     }
 
@@ -29,15 +31,10 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Atualizar a senha do usuário
-    await prisma.user.update({
-      where: { email: resetRecord.email },
-      data: { password: hashedPassword },
-    });
+    await supabase.from('User').update({ password: hashedPassword, updatedAt: new Date().toISOString() }).eq('email', resetRecord.email);
 
     // Deletar o token usado
-    await prisma.passwordResetToken.delete({
-      where: { id: resetRecord.id },
-    });
+    await supabase.from('PasswordResetToken').delete().eq('id', resetRecord.id);
 
     return NextResponse.json({ success: true, message: 'Senha redefinida com sucesso!' });
   } catch (error) {

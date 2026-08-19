@@ -1,20 +1,18 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
 
-    const campaign = await prisma.campaign.findUnique({
-      where: { id },
-      include: {
-        recipients: {
-          orderBy: { email: 'asc' }
-        }
-      }
-    });
+    const { data: campaign, error } = await supabase
+      .from('Campaign')
+      .select('*, recipients:CampaignRecipient(*)')
+      .eq('id', id)
+      .order('email', { referencedTable: 'CampaignRecipient', ascending: true })
+      .single();
 
-    if (!campaign) {
+    if (error || !campaign) {
       return NextResponse.json({ error: 'Campanha não encontrada' }, { status: 404 });
     }
 

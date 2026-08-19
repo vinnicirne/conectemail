@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 // date-fns removido para usar Intl nativo
@@ -6,9 +6,11 @@ import { ArrowLeft, MailOpen } from "lucide-react";
 
 export default async function EmailDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const email = await prisma.email.findUnique({
-    where: { id },
-  });
+  const { data: email } = await supabase
+    .from('Email')
+    .select('*')
+    .eq('id', id)
+    .single();
 
   if (!email) {
     notFound();

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import prisma from '@/lib/prisma';
-
+import { supabase } from '@/lib/supabase';
+import crypto from 'crypto';
 
 export async function POST(request: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -13,14 +13,20 @@ export async function POST(request: Request) {
     }
 
     // Save email intention in database
-    const emailRecord = await prisma.email.create({
-      data: {
-        toAddress: to,
-        subject,
-        htmlContent: html,
-        status: 'SENDING',
-      },
-    });
+    const emailId = crypto.randomUUID();
+    const { data: emailRecord, error: insertError } = await supabase.from('Email').insert({
+      id: emailId,
+      toAddress: to,
+      subject,
+      htmlContent: html,
+      status: 'SENDING',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }).select().single();
+
+    if (insertError || !emailRecord) {
+      throw insertError || new Error('Failed to create email record');
+    }
 
     // Send via Resend
     const { data, error } = await resend.emails.send({
@@ -34,21 +40,16 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      await prisma.email.update({
-        where: { id: emailRecord.id },
-        data: { status: 'FAILED' },
-      });
+      await supabase.from('Email').update({ status: 'FAILED', updatedAt: new Date().toISOString() }).eq('id', emailRecord.id);
       return NextResponse.json({ error }, { status: 400 });
     }
 
     // Update database with Resend ID and SENT status
-    await prisma.email.update({
-      where: { id: emailRecord.id },
-      data: { 
-        status: 'SENT',
-        resendId: data?.id 
-      },
-    });
+    await supabase.from('Email').update({
+      status: 'SENT',
+      resendId: data?.id,
+      updatedAt: new Date().toISOString()
+    }).eq('id', emailRecord.id);
 
     return NextResponse.json({ success: true, emailId: emailRecord.id, resendId: data?.id });
 
