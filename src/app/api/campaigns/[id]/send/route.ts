@@ -6,7 +6,6 @@ import { Resend } from 'resend';
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const resend = new Resend(process.env.RESEND_API_KEY);
   try {
     const { id } = await params;
 
@@ -39,6 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 }
 
 async function processCampaign(campaignId: string) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
   try {
     const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign) return;
