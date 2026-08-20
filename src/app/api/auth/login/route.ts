@@ -21,13 +21,19 @@ export async function POST(request: Request) {
       .eq('email', email.toLowerCase())
       .single();
 
+    if (dbError) {
+      console.error('Supabase DB error on login:', dbError);
+    }
+
     if (!user) {
+      console.log('Login failed: User not found or blocked by RLS for email:', email);
       return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      console.log('Login failed: Password mismatch for email:', email);
       return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });
     }
 
