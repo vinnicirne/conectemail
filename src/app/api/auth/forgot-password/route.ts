@@ -12,23 +12,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'E-mail é obrigatório' }, { status: 400 });
     }
 
-    const { data: user } = await supabase
+    const { data: user, error: dbError } = await supabase
       .from('User')
       .select('email')
       .eq('email', email.toLowerCase())
       .single();
 
+    if (dbError) {
+      console.error('Supabase error querying user:', dbError);
+    }
+
     if (!user) {
+      console.log('User not found or blocked by RLS for email:', email);
       // Retornar sucesso de qualquer forma por segurança (para não revelar se o email existe)
       return NextResponse.json({ success: true, message: 'Se o e-mail existir, você receberá um link.' });
     }
+
+    console.log('User found:', user.email);
 
     // Gerar token seguro
     const token = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
 
     // Salvar token no banco
-    await supabase.from('PasswordResetToken').insert({
+    const { error: tokenError } = await supabase.from('PasswordResetToken').insert({
       id: crypto.randomUUID(),
       email: user.email,
       token,
@@ -36,10 +43,16 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString()
     });
 
+    if (tokenError) {
+      console.error('Error inserting token:', tokenError);
+      throw new Error('Could not insert token');
+    }
+
     // Enviar email
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
     
-    await resend.emails.send({
+    console.log('Sending email to:', user.email);
+    const { data, error: resendError } = await resend.emails.send({
       from: 'Angell Brindes <no-reply@conectemail.shop>',
       to: [user.email],
       subject: 'Redefinição de Senha - Painel Administrativo',
@@ -56,6 +69,12 @@ export async function POST(request: Request) {
       `,
     });
 
+    if (resendError) {
+      console.error('Resend API Error:', resendError);
+      return NextResponse.json({ error: 'Erro ao enviar o e-mail via Resend' }, { status: 500 });
+    }
+
+    console.log('Email sent successfully via Resend:', data);
     return NextResponse.json({ success: true, message: 'Se o e-mail existir, você receberá um link.' });
   } catch (error) {
     console.error('Forgot password error:', error);
