@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Mail, PenSquare, Megaphone, Users } from "lucide-react";
+import { Mail, PenSquare, Megaphone, Users, LogOut } from "lucide-react";
 
 export default function SidebarWrapper() {
   const pathname = usePathname();
@@ -37,6 +37,20 @@ export default function SidebarWrapper() {
           Listas
         </Link>
       </nav>
+
+      <div style={{ marginTop: 'auto', paddingTop: '24px' }}>
+        <button 
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+          }}
+          className="nav-link" 
+          style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'left' }}
+        >
+          <LogOut size={20} />
+          Sair da Conta
+        </button>
+      </div>
     </aside>
   );
 }

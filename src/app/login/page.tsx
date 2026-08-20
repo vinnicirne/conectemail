@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, KeyRound } from "lucide-react";
+import { Lock, Mail, KeyRound, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,14 +89,37 @@ export default function LoginPage() {
             <div style={{ position: "relative" }}>
               <KeyRound size={18} color="var(--text-muted)" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 className="input-field"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{ paddingLeft: "42px" }}
+                style={{ paddingLeft: "42px", paddingRight: "42px" }}
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ 
+                  position: "absolute", 
+                  right: "14px", 
+                  top: "50%", 
+                  transform: "translateY(-50%)", 
+                  background: "transparent", 
+                  border: "none", 
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0
+                }}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} color="var(--text-muted)" />
+                ) : (
+                  <Eye size={18} color="var(--text-muted)" />
+                )}
+              </button>
             </div>
           </div>
 
