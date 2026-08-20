@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, FileText, Upload, Trash2, CheckCircle2 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 type ContactListMember = {
   id: string;
@@ -26,6 +27,7 @@ export default function ListDetailsPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"members" | "paste" | "csv">("members");
+  const [singleEmail, setSingleEmail] = useState("");
 
   // State para colar texto
   const [pastedText, setPastedText] = useState("");
@@ -158,13 +160,66 @@ export default function ListDetailsPage({ params }: { params: Promise<{ id: stri
         >
           Colar Texto / E-mails
         </button>
+        <button
+          onClick={() => setActiveTab("csv")}
+          style={{
+            background: "none", border: "none", padding: "12px 16px", cursor: "pointer", fontSize: "15px", fontWeight: 500,
+            color: activeTab === "csv" ? "var(--primary)" : "var(--text-muted)",
+            borderBottom: activeTab === "csv" ? "2px solid var(--primary)" : "2px solid transparent",
+            marginBottom: "-1px"
+          }}
+        >
+          Importar Planilha (Excel/CSV)
+        </button>
       </div>
 
       {activeTab === "members" && (
         <div className="glass-panel" style={{ padding: "0" }}>
+          
+          <div style={{ padding: "24px", borderBottom: "1px solid var(--border-color)", display: "flex", gap: "12px", alignItems: "flex-end" }}>
+            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+              <label>Adicionar Individualmente</label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="email@exemplo.com"
+                value={singleEmail}
+                onChange={(e) => setSingleEmail(e.target.value)}
+              />
+            </div>
+            <button
+              className="btn-primary"
+              disabled={!singleEmail || adding}
+              onClick={async () => {
+                if (!singleEmail) return;
+                setAdding(true);
+                try {
+                  const res = await fetch(`/api/lists/${listId}/members`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ emails: [singleEmail], source: 'manual' })
+                  });
+                  if (res.ok) {
+                    setSingleEmail("");
+                    fetchList();
+                  } else {
+                    const data = await res.json();
+                    alert(data.error);
+                  }
+                } catch (err) {
+                  alert("Erro ao adicionar");
+                } finally {
+                  setAdding(false);
+                }
+              }}
+            >
+              {adding ? "Adicionando..." : "Adicionar"}
+            </button>
+          </div>
+
           {list.members.length === 0 ? (
             <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
-              Esta lista está vazia. Vá para a aba "Colar Texto" para importar contatos.
+              Esta lista está vazia. Adicione acima ou vá para a aba "Colar Texto" / "Importar Planilha".
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -237,6 +292,58 @@ export default function ListDetailsPage({ params }: { params: Promise<{ id: stri
               {adding ? "Adicionando..." : "Importar para a Lista"}
             </button>
           </div>
+        </div>
+      )}
+
+      {activeTab === "csv" && (
+        <div className="glass-panel" style={{ padding: "32px" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "8px" }}>Importar Planilha</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "24px" }}>
+            Selecione um arquivo Excel (.xlsx) ou CSV contendo e-mails. O sistema procurará os e-mails automaticamente.
+          </p>
+
+          <input
+            type="file"
+            accept=".csv, .xlsx, .xls"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const data = event.target?.result;
+                if (!data) return;
+                
+                try {
+                  const workbook = XLSX.read(data, { type: "array" });
+                  const firstSheetName = workbook.SheetNames[0];
+                  const worksheet = workbook.Sheets[firstSheetName];
+                  
+                  // Converte a planilha para array de arrays
+                  const jsonData = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 });
+                  
+                  // Extrai o texto juntando todas as linhas e colunas
+                  const text = jsonData.map(row => row.join(" ")).join(" ");
+                  
+                  // Usa regex para extrair emails
+                  const regex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+                  const matches = text.match(regex) || [];
+                  const uniqueEmails = [...new Set(matches.map(em => em.toLowerCase()))];
+                  
+                  setExtractedEmails(uniqueEmails);
+                  // Coloca o texto extraído no textarea para o usuário revisar
+                  setPastedText(uniqueEmails.join("\n"));
+                  setActiveTab("paste");
+                } catch (error) {
+                  console.error("Erro ao ler arquivo:", error);
+                  alert("Não foi possível ler o arquivo. Certifique-se de que é um Excel ou CSV válido.");
+                }
+              };
+              reader.readAsArrayBuffer(file);
+            }}
+            className="input-field"
+            style={{ width: "100%", padding: "12px", marginBottom: "24px" }}
+          />
         </div>
       )}
 
